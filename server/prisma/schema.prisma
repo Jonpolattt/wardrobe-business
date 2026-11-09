@@ -1,0 +1,294 @@
+// Wardrobe Business — data model
+//
+// Money rules
+//  * Money is never stored as Float. Amounts use DECIMAL columns.
+//  * Amounts in a purchase are kept in the currency they were entered in
+//    (`Purchase.currency`) together with the exchange-rate snapshot to UZS
+//    (`fxRateToUzs`), so later changes of exchange rates never rewrite history.
+//  * Analytics are calculated in UZS (the store sells in UZS).
+//  * Rounding: ROUND_HALF_UP; money to 2 decimals, per-unit cost with cargo to 4
+//    decimals (see src/common/money/pricing.ts).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Currency {
+  UZS
+  USD
+  CNY
+}
+
+enum PricingMode {
+  MARKUP // the user entered the markup percent, the sale price is derived
+  PRICE // the user entered the sale price, the markup percent is derived
+}
+
+enum BatchStatus {
+  PREPARING
+  IN_TRANSIT
+  DELIVERED
+}
+
+enum GarmentKind {
+  shirt
+  coat
+  pants
+  knit
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Accounts — the application is closed: exactly two accounts (slot 1 and 2).
+// A CHECK constraint in the migration limits `slot` to 1..2, the unique index
+// on `slot` makes a third account impossible even with direct SQL access.
+// ---------------------------------------------------------------------------
+model User {
+  id                String    @id
+  slot              Int       @unique
+  email             String    @unique
+  passwordHash      String
+  firstName         String    @default("")
+  lastName          String    @default("")
+  phone             String?
+  photoUrl          String?
+  passwordChangedAt DateTime  @default(now())
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions   Session[]
+  activities ActivityEvent[]
+
+  @@map("users")
+}
+
+// Refresh-token sessions. The raw refresh token is never stored, only its
+// SHA-256 hash. Every refresh rotates the token: the old row is revoked and
+// points to its replacement; presenting a revoked token revokes the family.
+model Session {
+  id            String    @id @default(uuid())
+  userId        String
+  familyId      String
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  revokedReason String?
+  replacedById  String?
+  userAgent     String?
+  ip            String?
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+model Category {
+  id        String   @id @default(uuid())
+  key       String   @unique // stable key used by the UI, e.g. "T-shirts"
+  nameRu    String
+  nameUz    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id             String      @id @default(uuid())
+  code           String      @unique // human readable code, e.g. WR-001
+  nameRu         String
+  nameUz         String
+  sku            String?     @unique // SKU in the online store (style-hub-back)
+  categoryId     String
+  color          String      @default("#a8a698")
+  kind           GarmentKind @default(shirt)
+  photos         String[]    @default([])
+  // Stable link to the store product (style-hub-back Product.id).
+  storeProductId String?     @unique
+  archivedAt     DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  category     Category      @relation(fields: [categoryId], references: [id])
+  storeProduct StoreProduct? @relation(fields: [storeProductId], references: [externalId])
+  purchases    Purchase[]
+
+  @@index([categoryId])
+  @@map("products")
+}
+
+// A shipment ("партия"). Its totals are derived from its purchases.
+model Batch {
+  id          String      @id @default(uuid())
+  code        String      @unique // BT-012
+  nameRu      String
+  nameUz      String
+  originRu    String      @default("")
+  originUz    String      @default("")
+  status      BatchStatus @default(IN_TRANSIT)
+  orderDate   DateTime?   @db.Date
+  arrivalDate DateTime?   @db.Date
+  // Planned figures entered when the batch is created; shown until real
+  // purchases are added to the batch.
+  plannedUnits        Int?
+  plannedCost         Decimal?  @db.Decimal(18, 2)
+  plannedCurrency     Currency?
+  plannedFxRateToUzs  Decimal?  @db.Decimal(18, 6)
+  archivedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  purchases Purchase[]
+
+  @@map("batches")
+}
+
+// One purchase lot of a product. A product can be bought many times at
+// different prices and with different cargo costs.
+model Purchase {
+  id            String      @id @default(uuid())
+  productId     String
+  batchId       String?
+  currency      Currency
+  fxRateToUzs   Decimal     @db.Decimal(18, 6) // UZS per 1 unit of `currency` (snapshot)
+  unitCost      Decimal     @db.Decimal(18, 2) // purchase price of one unit
+  quantity      Int
+  cargoTotal    Decimal     @default(0) @db.Decimal(18, 2) // cargo for the whole lot
+  pricingMode   PricingMode @default(MARKUP)
+  markupPercent Decimal     @db.Decimal(9, 2)
+  salePrice     Decimal     @db.Decimal(18, 2)
+
+  // Derived values, recalculated by the backend on every write.
+  purchaseTotal     Decimal @db.Decimal(18, 2) // unitCost × quantity
+  cargoPerUnit      Decimal @db.Decimal(18, 4) // cargoTotal / quantity
+  unitCostWithCargo Decimal @db.Decimal(18, 4) // unitCost + cargoPerUnit
+  totalCost         Decimal @db.Decimal(18, 2) // purchaseTotal + cargoTotal
+  expectedRevenue   Decimal @db.Decimal(18, 2) // salePrice × quantity
+  expectedProfit    Decimal @db.Decimal(18, 2) // (salePrice − unitCostWithCargo) × quantity
+
+  orderDate   DateTime? @db.Date
+  arrivalDate DateTime? @db.Date
+  createdById String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([productId])
+  @@index([batchId])
+  @@map("purchases")
+}
+
+// ---------------------------------------------------------------------------
+// Online store (style-hub-back) — read-only copies, written only by the sync.
+// ---------------------------------------------------------------------------
+model StoreProduct {
+  externalId String   @id // style-hub-back Product.id
+  sku        String
+  title      String
+  titleRu    String?
+  price      Decimal  @db.Decimal(18, 2)
+  stock      Int // the store is the source of truth for stock
+  soldCount  Int
+  isActive   Boolean
+  syncedAt   DateTime
+
+  product Product?
+  sales   StoreSale[]
+
+  @@index([sku])
+  @@map("store_products")
+}
+
+// One order line of the store. Upserted by its external id, so a repeated
+// sync never duplicates sales. `counted` mirrors the store rule: stock leaves
+// the warehouse when the order is PAID and not CANCELLED.
+model StoreSale {
+  externalItemId  String   @id // style-hub-back OrderItem.id
+  externalOrderId String
+  orderNumber     String
+  storeProductId  String
+  quantity        Int
+  unitPrice       Decimal  @db.Decimal(18, 2)
+  currency        Currency @default(UZS)
+  orderStatus     String
+  paymentStatus   String
+  counted         Boolean
+  orderedAt       DateTime
+  firstSeenAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  storeProduct StoreProduct @relation(fields: [storeProductId], references: [externalId])
+
+  @@index([storeProductId])
+  @@index([orderedAt])
+  @@index([externalOrderId])
+  @@map("store_sales")
+}
+
+model SyncRun {
+  id               String     @id @default(uuid())
+  status           SyncStatus
+  trigger          String
+  startedAt        DateTime   @default(now())
+  finishedAt       DateTime?
+  productsSeen     Int        @default(0)
+  ordersSeen       Int        @default(0)
+  salesCreated     Int        @default(0)
+  salesUpdated     Int        @default(0)
+  productsLinked   Int        @default(0)
+  error            String?
+
+  @@index([startedAt])
+  @@map("sync_runs")
+}
+
+// ---------------------------------------------------------------------------
+// Settings & activity
+// ---------------------------------------------------------------------------
+model AppSettings {
+  id          Int      @id @default(1)
+  usdToUzs    Decimal  @db.Decimal(18, 6)
+  usdToCny    Decimal  @db.Decimal(18, 6)
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model ActivityEvent {
+  id        String   @id @default(uuid())
+  type      String
+  title     String
+  meta      Json?
+  userId    String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("activity_events")
+}

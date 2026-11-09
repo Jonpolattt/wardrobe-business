@@ -1,0 +1,533 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type ActivityItem {
+  actorName: String
+  createdAt: DateTime!
+  id: ID!
+
+  """Units (purchases) or new/updated sales (store sync)"""
+  quantity: Int
+  title: String!
+  type: String!
+}
+
+type AuthPayload {
+  """
+  Short-lived JWT, send it as "Authorization: Bearer <token>"
+  """
+  accessToken: String!
+
+  """Access token lifetime in seconds"""
+  expiresIn: Int!
+  user: User!
+}
+
+"""
+Shipment. All *Uzs totals are calculated by the backend from its purchase lots.
+"""
+type Batch {
+  """null when none of the products is linked to the store"""
+  actualProfitUzs: Decimal
+  archived: Boolean!
+  arrivalDate: String
+  code: String!
+  cogsUzs: Decimal!
+  createdAt: DateTime!
+
+  """
+  Display date: arrival, otherwise order, otherwise creation date (YYYY-MM-DD)
+  """
+  date: String!
+
+  """expected profit / total cost × 100"""
+  expectedProfitPercent: Decimal!
+  expectedProfitUzs: Decimal!
+  expectedRevenueUzs: Decimal!
+  id: ID!
+
+  """Number of active purchase lots"""
+  lotsCount: Int!
+  nameRu: String!
+  nameUz: String!
+
+  """netProfitUzs / totalCostUzs × 100"""
+  netProfitPercent: Decimal!
+
+  """Net result of the batch: revenue − total cost (UZS)"""
+  netProfitUzs: Decimal!
+  orderDate: String
+  originRu: String!
+  originUz: String!
+  plannedCost: Decimal
+  plannedCurrency: Currency
+  plannedUnits: Int
+
+  """Units in the batch (planned units while there are no lots)"""
+  quantity: Int!
+  revenueUzs: Decimal!
+  soldQty: Int!
+  status: BatchStatus!
+  totalCostUzs: Decimal!
+}
+
+input BatchInput {
+  arrivalDate: String
+  name: String!
+  nameUz: String
+  orderDate: String
+  origin: String
+  originUz: String
+  plannedCost: Decimal
+  plannedCurrency: Currency
+  plannedUnits: Int
+  status: BatchStatus
+}
+
+type BatchRef {
+  code: String!
+  id: ID!
+  nameRu: String!
+  nameUz: String!
+  status: BatchStatus!
+}
+
+enum BatchStatus {
+  DELIVERED
+  IN_TRANSIT
+  PREPARING
+}
+
+type Category {
+  id: ID!
+
+  """
+  Stable key used by the interface, e.g. "T-shirts"
+  """
+  key: String!
+  nameRu: String!
+  nameUz: String!
+  sortOrder: Int!
+}
+
+type CategoryBreakdown {
+  categories: [CategorySales!]!
+  totalUnits: Int!
+}
+
+type CategorySales {
+  key: String!
+  nameRu: String!
+  nameUz: String!
+  revenue: Decimal!
+  sharePercent: Decimal!
+  units: Int!
+}
+
+input ChangeEmailInput {
+  currentPassword: String!
+  newEmail: String!
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+enum ChartRange {
+  MONTH
+  WEEK
+  YEAR
+}
+
+enum Currency {
+  CNY
+  USD
+  UZS
+}
+
+input DashboardFilterInput {
+  """Selected batches (all their lots are included)"""
+  batchIds: [ID!]
+  periodDays: Int! = 30
+
+  """
+  Selected purchase lots; when set the totals are calculated for the selection (all time)
+  """
+  purchaseIds: [ID!]
+}
+
+type DashboardStats {
+  current: DashboardTotals!
+  expensesChangePercent: Decimal
+  expensesSpark: [Float!]!
+  from: DateTime
+
+  """Previous period of the same length; null for a selection"""
+  previous: DashboardTotals
+  profitChangePercent: Decimal
+  profitSpark: [Float!]!
+
+  """
+  Change vs the previous period, percent (null for a selection or an empty previous period)
+  """
+  revenueChangePercent: Decimal
+
+  """Chart helpers (10 points, display only)"""
+  revenueSpark: [Float!]!
+  salesChangePercent: Decimal
+  salesSpark: [Float!]!
+
+  """True when the stats are calculated for selected lots/batches"""
+  selection: Boolean!
+  to: DateTime!
+}
+
+type DashboardTotals {
+  """Expected profit of the lots in scope (UZS)"""
+  expectedProfit: Decimal!
+
+  """Purchase spending incl. cargo (UZS)"""
+  expenses: Decimal!
+
+  """
+  Actual profit = revenue − FIFO cost of the units with a known cost (UZS)
+  """
+  profit: Decimal!
+
+  """Revenue from counted store sales (UZS)"""
+  revenue: Decimal!
+
+  """Units sold"""
+  salesCount: Int!
+
+  """
+  Sold units whose purchase cost is unknown (not linked or oversold) — excluded from profit
+  """
+  unallocatedUnits: Int!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+Exact decimal number serialized as a string, e.g. "12840.50"
+"""
+scalar Decimal
+
+type DeleteResult {
+  """
+  true — the record has financial history and was archived instead of deleted
+  """
+  archived: Boolean!
+  id: ID!
+}
+
+"""Shared exchange rates: how many units of a currency equal 1 USD"""
+type ExchangeRates {
+  updatedAt: DateTime!
+  usdToCny: Decimal!
+  usdToUzs: Decimal!
+}
+
+type ExpenseRow {
+  amountUzs: Decimal!
+  date: String!
+  id: ID!
+
+  """Inventory (purchase) or Logistics (cargo)"""
+  kind: String!
+  purchaseId: ID!
+  titleRu: String!
+  titleUz: String!
+}
+
+enum GarmentKind {
+  coat
+  knit
+  pants
+  shirt
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+type Mutation {
+  changeEmail(input: ChangeEmailInput!): User!
+
+  """
+  Changes the password, revokes all sessions and signs this browser in again
+  """
+  changePassword(input: ChangePasswordInput!): AuthPayload!
+  createBatch(input: BatchInput!): Batch!
+  createPurchase(input: PurchaseInput!): Purchase!
+
+  """Requires the current user password"""
+  deleteBatch(id: ID!, password: String!): DeleteResult!
+
+  """Requires the current user password"""
+  deletePurchase(id: ID!, password: String!): DeleteResult!
+
+  """Sign in; sets the HttpOnly refresh cookie"""
+  login(input: LoginInput!): AuthPayload!
+
+  """Revokes the current session and clears the refresh cookie"""
+  logout: Boolean!
+
+  """Rotates the refresh cookie and returns a new access token"""
+  refreshSession: AuthPayload!
+  resetExchangeRates: ExchangeRates!
+  revokeSession(id: ID!): Boolean!
+
+  """Imports products and sales from the online store now"""
+  syncStore: SyncRun!
+  updateBatch(id: ID!, input: BatchInput!): Batch!
+  updateExchangeRates(input: UpdateExchangeRatesInput!): ExchangeRates!
+  updateProfile(input: UpdateProfileInput!): User!
+  updatePurchase(id: ID!, input: PurchaseInput!): Purchase!
+}
+
+"""MARKUP — markup percent is entered; PRICE — sale price is entered"""
+enum PricingMode {
+  MARKUP
+  PRICE
+}
+
+type Product {
+  archivedAt: DateTime
+  category: Category!
+  code: String!
+  color: String!
+  createdAt: DateTime!
+  id: ID!
+  kind: GarmentKind!
+  nameRu: String!
+  nameUz: String!
+  photos: [String!]!
+  sku: String
+  storeProduct: StoreLink
+}
+
+type Purchase {
+  """Actual profit; null when the product is not linked to the store"""
+  actualProfitUzs: Decimal
+  archived: Boolean!
+  arrivalDate: String
+  batch: BatchRef
+  cargoPerUnit: Decimal!
+
+  """Cargo per unit in UZS"""
+  cargoPerUnitUzs: Decimal!
+  cargoTotal: Decimal!
+  cargoTotalUzs: Decimal!
+
+  """Cost of goods sold for this lot (UZS)"""
+  cogsUzs: Decimal!
+  createdAt: DateTime!
+  currency: Currency!
+  expectedProfit: Decimal!
+  expectedProfitUzs: Decimal!
+  expectedRevenue: Decimal!
+
+  """salePrice × quantity in UZS"""
+  expectedRevenueUzs: Decimal!
+  fxRateToUzs: Decimal!
+
+  """True when sales data comes from the linked store product"""
+  hasSalesData: Boolean!
+  id: ID!
+  markupPercent: Decimal!
+  orderDate: String
+  pricingMode: PricingMode!
+  product: Product!
+  purchaseTotal: Decimal!
+  quantity: Int!
+
+  """
+  Expected profit of the units still in stock (remainingQty × unit profit), UZS
+  """
+  remainingProfitUzs: Decimal!
+  remainingQty: Int!
+
+  """Revenue of the units sold from this lot (UZS)"""
+  revenueUzs: Decimal!
+  salePrice: Decimal!
+  salePriceUzs: Decimal!
+
+  """Units sold from this lot (FIFO over synced store sales)"""
+  soldQty: Int!
+  totalCost: Decimal!
+  totalCostUzs: Decimal!
+  unitCost: Decimal!
+  unitCostUzs: Decimal!
+  unitCostWithCargo: Decimal!
+  unitCostWithCargoUzs: Decimal!
+
+  """salePrice − unitCostWithCargo per unit, UZS"""
+  unitProfitUzs: Decimal!
+  updatedAt: DateTime!
+}
+
+input PurchaseFilterInput {
+  batchId: ID
+  categoryKey: String
+  includeArchived: Boolean = false
+  search: String
+}
+
+input PurchaseInput {
+  arrivalDate: String
+  batchId: ID
+
+  """Cargo cost for the whole lot"""
+  cargoTotal: Decimal
+  currency: Currency!
+  markupPercent: Decimal
+  orderDate: String
+  pricingMode: PricingMode!
+  product: PurchaseProductInput!
+  quantity: Int!
+  salePrice: Decimal
+
+  """Purchase price of one unit"""
+  unitCost: Decimal!
+}
+
+input PurchaseProductInput {
+  categoryKey: String!
+  color: String
+  kind: GarmentKind
+  name: String!
+
+  """Uzbek name; defaults to `name`"""
+  nameUz: String
+
+  """
+  Up to 6 photo URLs returned by POST /uploads; the first one is the cover
+  """
+  photos: [String!]
+
+  """Existing product (repeat purchase). Omit to create a new product."""
+  productId: ID
+  sku: String
+}
+
+type Query {
+  activity(limit: Int! = 8): [ActivityItem!]!
+  batch(id: ID!): Batch!
+  batches(includeArchived: Boolean = false): [Batch!]!
+  categories: [Category!]!
+  dashboard(filter: DashboardFilterInput!): DashboardStats!
+  exchangeRates: ExchangeRates!
+  expenses(periodDays: Int): [ExpenseRow!]!
+  me: User!
+  mySessions: [UserSession!]!
+
+  """Catalog search (used to purchase an existing product again)"""
+  products(limit: Int, search: String): [Product!]!
+  purchase(id: ID!): Purchase!
+  purchases(filter: PurchaseFilterInput): [Purchase!]!
+  revenueSeries(range: ChartRange!): RevenueSeries!
+  salesByCategory(periodDays: Int! = 30): CategoryBreakdown!
+  storeSyncStatus: StoreSyncStatus!
+}
+
+type RevenueSeries {
+  expensesChangePercent: Decimal
+  points: [SeriesPoint!]!
+  range: ChartRange!
+
+  """Revenue change vs the previous range, percent"""
+  revenueChangePercent: Decimal
+  totalExpenses: Decimal!
+  totalRevenue: Decimal!
+}
+
+type SeriesPoint {
+  """Bucket start, YYYY-MM-DD"""
+  date: String!
+  expenses: Decimal!
+  revenue: Decimal!
+}
+
+"""The linked product of the online store (read-only, filled by the sync)"""
+type StoreLink {
+  externalId: ID!
+  isActive: Boolean!
+  sku: String!
+  soldCount: Int!
+
+  """Current stock in the store — the source of truth for stock"""
+  stock: Int!
+  syncedAt: DateTime!
+  title: String!
+}
+
+type StoreSyncStatus {
+  """
+  STORE_GRAPHQL_URL, STORE_LOGIN and STORE_PASSWORD are set on the server
+  """
+  configured: Boolean!
+  lastRun: SyncRun
+}
+
+type SyncRun {
+  error: String
+  finishedAt: DateTime
+  id: ID!
+  ordersSeen: Int!
+  productsLinked: Int!
+  productsSeen: Int!
+  salesCreated: Int!
+  salesUpdated: Int!
+  startedAt: DateTime!
+  status: SyncStatus!
+  trigger: String!
+}
+
+enum SyncStatus {
+  FAILED
+  RUNNING
+  SUCCESS
+}
+
+input UpdateExchangeRatesInput {
+  usdToCny: Decimal
+  usdToUzs: Decimal
+}
+
+input UpdateProfileInput {
+  firstName: String!
+  lastName: String!
+  phone: String
+
+  """URL returned by POST /uploads, or null to remove the photo"""
+  photoUrl: String
+}
+
+type User {
+  createdAt: DateTime!
+  email: String!
+  firstName: String!
+  id: ID!
+  lastLoginAt: DateTime
+  lastName: String!
+  phone: String
+  photoUrl: String
+}
+
+type UserSession {
+  createdAt: DateTime!
+
+  """The session of the current browser"""
+  current: Boolean!
+  id: ID!
+  ip: String
+  lastUsedAt: DateTime!
+  userAgent: String
+}

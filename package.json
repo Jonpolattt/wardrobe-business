@@ -1,0 +1,31 @@
+{
+  "name": "wardrobe-business",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wardrobe Business — учёт закупок, партий, продаж и прибыли (Next.js + NestJS + PostgreSQL)",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run start:dev -w @wardrobe/server",
+    "dev:client": "npm run dev -w @wardrobe/client",
+    "build": "npm run build -w @wardrobe/server && npm run build -w @wardrobe/client",
+    "start": "concurrently -k -n api,web -c blue,green \"npm run start -w @wardrobe/server\" \"npm run start -w @wardrobe/client\"",
+    "typecheck": "npm run typecheck -w @wardrobe/server && npm run typecheck -w @wardrobe/client",
+    "test": "npm run test --workspaces --if-present",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run prisma:deploy -w @wardrobe/server",
+    "db:seed": "npm run seed -w @wardrobe/server",
+    "db:studio": "npm run prisma:studio -w @wardrobe/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20.19",
+    "npm": ">=10"
+  }
+}

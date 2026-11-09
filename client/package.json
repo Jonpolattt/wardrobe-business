@@ -1,0 +1,40 @@
+{
+  "name": "@wardrobe/client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wardrobe Business — Next.js frontend",
+  "dependencies": {
+    "@apollo/client": "^4.3.7",
+    "decimal.js": "^10.6.0",
+    "framer-motion": "^14.11.1",
+    "graphql": "^16.15.0",
+    "lucide-react": "^1.70.0",
+    "next": "^16.4.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-hook-form": "^7.91.0",
+    "recharts": "^3.10.1",
+    "rxjs": "^7.8.2",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "postcss": "^8.5.32",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~5.9",
+    "vitest": "^5.1.0"
+  },
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

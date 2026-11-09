@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+
+# Generated Prisma client (re-created by `npm install` / `prisma generate`)
+server/src/generated/
+
+# Secrets and local configuration — never commit
+.env
+.env.*
+!.env.example
+
+# Uploaded photos and test artefacts (anchored: server/src/modules/uploads is source code)
+/uploads/
+server/uploads/
+server/test-uploads/
+
+# Logs and OS files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
